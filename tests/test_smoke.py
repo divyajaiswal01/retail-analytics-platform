@@ -2,7 +2,15 @@
 
 from pathlib import Path
 
-REQUIRED_DIRS = ["data/raw", "ingestion", "dbt_project", "forecasting", "dashboard", "tests", "docs"]
+REQUIRED_DIRS = [
+    "data/raw",
+    "ingestion",
+    "dbt_project",
+    "forecasting",
+    "dashboard",
+    "tests",
+    "docs",
+]
 
 
 def test_core_imports() -> None:
