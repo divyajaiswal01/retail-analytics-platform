@@ -1,0 +1,24 @@
+name: retail_analytics
+version: "1.0.0"
+config-version: 2
+profile: retail_analytics
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+# Analysis window decided in Phase 3 (see docs/data_findings.md, finding #2).
+# Rows outside the window are KEPT in the facts and flagged via in_analysis_window.
+vars:
+  analysis_start_date: "2017-01-01"
+  analysis_end_date: "2018-08-31"
+
+models:
+  retail_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

@@ -1,205 +1,60 @@
 # Data Findings & Decisions
 
-**Source:** `analytics/notebooks/01_eda.ipynb` run on the real Olist dataset.
-**Purpose:** record every data issue and the decision made, so dbt staging (Phase 4) is traceable to evidence.
-
-> How to use: run the notebook, then fill the **Evidence** column with your real numbers.
-> The **Proposed decision** column is a sensible default to confirm or change after you see the evidence.
-> Do not keep a decision you can't justify with a number from your own run.
+**Source:** `analytics/notebooks/01_eda.ipynb` run on the real Olist dataset (summary cell output).
+**Purpose:** every cleaning rule in dbt (Phase 4) traces back to a row in this table.
+**Currency:** BRL. **Not reviewed yet:** notebook section 2 (null rates) and the full review-score distribution; add notes below if they reveal anything.
 
 ---
 
-## 1. Dataset snapshot (fill from notebook sections 1 and 5)
+## 1. Dataset snapshot
 
 | Item | Value |
 |---|---|
-| Tables loaded | |
-| Total orders | |
-| First order date | |
-| Last order date | |
-| Usable window chosen | |
-| Reason for window | |
+| Tables loaded | 9 |
+| Total orders | 99,441 |
+| Order items | 112,650 |
+| Customers (`customer_id`) / real people (`customer_unique_id`) | 99,441 / 96,096 |
+| Products / sellers | 32,951 / 3,095 |
+| First order month | 2016-09 |
+| Last order month | 2018-10 |
+| **Analysis window chosen** | **2017-01-01 to 2018-08-31 (20 full months)** |
+| Reason for window | 2016 has only 329 orders in 3 months (Nov 2016 is missing entirely). Sep and Oct 2018 have 16 and 4 orders, none delivered, so the data effectively ends in Aug 2018. Jan 2017 (800 orders) is a ramp-up month but is kept so the window covers Nov 2017. |
+
+Window is a dbt variable (`analysis_start_date`, `analysis_end_date` in `dbt_project.yml`). Rows outside it are kept in the facts and flagged `in_analysis_window = false`.
 
 ---
 
 ## 2. Issues & decisions
 
-| # | Area | What to check (notebook section) | Evidence (your numbers) | Proposed decision | Implemented in |
-|---|---|---|---|---|---|
-| 1 | Customer identity | `customer_id` vs `customer_unique_id` uniqueness (3) | | Use `customer_unique_id` as the true customer key for repeat rate, RFM, and cohorts | `dim_customer` |
-| 2 | Sparse months | Orders per month at start/end of data (5) | | Restrict analysis and forecasting to months above a minimum order volume | `dim_date`, forecast mart |
-| 3 | Order status | Share of non-delivered statuses (6) | | Count revenue only for `delivered` orders; keep other statuses in the fact table with a flag | `fact_orders` |
-| 4 | Delivered, no date | `delivered_missing_date` (7) | | Exclude from on-time % and delivery-days metrics; keep in revenue | `fact_orders` |
-| 5 | Impossible dates | `delivered_before_purchase` (7) | | Set delivery metrics to NULL and flag the row | `stg_orders` |
-| 6 | Multiple payments | Payments per order (8) | | Aggregate payments to one row per order before joining | `fact_orders` |
-| 7 | Orders without items | `orders_without_items` by status (8) | | Keep in `fact_orders`; exclude from item-level analysis | `fact_orders` |
-| 8 | Payment mismatch | Item total vs payment total (8) | | Use item price as the revenue measure; report payment mismatches as a quality note | `fact_orders` |
-| 9 | Multiple reviews | Reviews per order (9) | | Keep one review per order (the most recent by answer timestamp) | `stg_reviews` |
-| 10 | Missing category | `no_category` (10) | | Map to `unknown` category rather than dropping products | `dim_product` |
-| 11 | Untranslated categories | Categories with no English name (10) | | Add manual translations or fall back to the Portuguese name | `dim_product` |
-| 12 | Zero/NULL weights | `weight_zero`, `weight_missing` (10) | | Treat as NULL; do not impute for now | `stg_products` |
-| 13 | Price/freight outliers | Zero/negative values and p99 vs max (11) | | Keep values; flag extreme outliers; never silently delete | `stg_order_items` |
-| 14 | Orphan keys | Orphan counts (4) | | Keep rows; use LEFT JOINs; assign unknown member where a dimension is missing | marts |
-| 15 | Geolocation grain | Rows per zip prefix (12) | | Reduce to one row per zip prefix (average lat/lng) before joining | `stg_geolocation` |
-
-Add new rows below as you discover more issues.
+| # | Area | Evidence (real numbers) | Decision | Implemented in |
+|---|---|---|---|---|
+| 1 | Customer identity | 99,441 `customer_id` but only 96,096 `customer_unique_id`: 3,345 repeat IDs | Use `customer_unique_id` as the customer key for repeat rate, RFM, cohorts | `dim_customer`, `fact_orders.customer_key` |
+| 2 | Sparse months | 2016: 4 / 324 / 1 orders (Sep, Oct, Dec). 2018-09: 16, 2018-10: 4 | Analysis window 2017-01 to 2018-08; out-of-window rows flagged, not deleted | `fact_orders`, `fact_order_items` |
+| 3 | Order status | delivered 96,478 (97.02%); shipped 1,107; canceled 625; unavailable 609; invoiced 314; processing 301; created 5; approved 2 | Revenue counts delivered orders only (`delivered_revenue`); other statuses kept with `order_status` | `fact_orders` |
+| 4 | Delivered, no date | 8 delivered orders have no delivery date | Excluded from delivery days and on-time %; still count toward revenue | `fact_orders.delivery_days`, `is_late` |
+| 5 | Dates out of logic | 0 delivered-before-purchase; but 6 non-delivered orders have a delivery date | No fix needed for the first; delivery metrics use delivered status only, so the 6 are ignored; a test guards negative days | `fact_orders`, test `assert_no_negative_delivery_days` |
+| 6 | Multiple payments | 96,479 orders have 1 payment; 2,961 have 2 to 29; 1 order has none | Aggregate payments to one row per order before joining (otherwise revenue is double counted) | `fact_orders`, test `assert_payments_not_double_counted` |
+| 7 | Orders without items | 775 orders (0.78%); 768 orders without reviews | Keep in `fact_orders` with `item_count = 0`; item-level analysis uses `fact_order_items` | `fact_orders` |
+| 8 | Payment vs items | 249 of 98,665 orders (0.25%) differ by more than 1.00 BRL | Revenue = sum of item price (excluding freight); payment totals kept as a separate column | `fact_orders` |
+| 9 | Duplicate reviews | `review_id` repeats (814 duplicate rows); 543 orders have 2 reviews and 4 have 3 | Keep the most recent review per order (answer time, then creation time, then `review_id`) | `stg_reviews`; unique test on `order_id` |
+| 10 | Missing category | 610 products (1.85%) have no category | Map to `unknown` rather than dropping products | `dim_product` |
+| 11 | Untranslated categories | 2 categories (13 products): `portateis_cozinha_e_preparadores_de_alimentos` (10), `pc_gamer` (3) | Add manual English names | `stg_category_translation` |
+| 12 | Product weights | 2 missing, 4 zero | Treat zero as NULL; no imputation | `stg_products` |
+| 13 | Outliers | Price: min 0.85, none zero or negative, p99 890, max 6,735. Freight: 383 rows at zero. Payment value: 9 rows at zero | Keep all values; nothing silently deleted. Zero freight is probably free shipping (hypothesis, not verified) | `stg_order_items`, `stg_order_payments` |
+| 14 | Orphan keys | 0 orphans on every relationship except products to category translation (13) | Relationship tests enforce this going forward; any future orphan fails the build | `schema.yml` tests |
+| 15 | Geolocation grain | 1,000,163 rows for 19,015 zip prefixes (about 53 per zip) | Reduce to one row per zip using median coordinates; not joined into marts yet (map uses state) | `stg_geolocation` |
 
 ---
 
 ## 3. Data quality notes for the README
 
-Short list of known limitations to state honestly in the final documentation (e.g. date coverage, anonymized data, BRL currency, any dropped or flagged records).
-
--
--
--
-
----
-
-
+- Coverage is Sep 2016 to Oct 2018, but only Jan 2017 to Aug 2018 is analysed (20 months).
+- The 20-month window contains only one holiday season (Nov 2017 spike: 7,544 orders vs 4,631 in Oct), so **yearly seasonality cannot be learned reliably**. A 52-week seasonal baseline is only possible from the second year onward. State this in the forecast report instead of overclaiming.
+- Data is anonymised and from a single Brazilian marketplace; all money is BRL, not converted.
+- Customers are identified by `customer_unique_id`; repeat purchasing is rare (3,345 of 99,441 `customer_id` rows, 3.4%, are extra IDs for returning customers), so repeat rate and cohort retention will be low and noisy.
+- 97% of orders are delivered, so status effects on revenue are small.
 
 ## 4. Open questions
 
-Anything that needs a decision before Phase 4:
-
--
-RESULTS 
-=== 1. ROW COUNTS ===
-               table    rows
-           customers   99441
-         geolocation 1000163
-         order_items  112650
-      order_payments  103886
-       order_reviews   99224
-              orders   99441
-            products   32951
-             sellers    3095
-category_translation      71
-
-=== 3. KEY UNIQUENESS ===
-               table                          key   rows  distinct_keys  duplicate_rows
-           customers                  customer_id  99441          99441               0
-           customers           customer_unique_id  99441          96096            3345
-              orders                     order_id  99441          99441               0
-         order_items      order_id, order_item_id 112650         112650               0
-      order_payments order_id, payment_sequential 103886         103886               0
-       order_reviews                    review_id  99224          98410             814
-       order_reviews                     order_id  99224          98673             551
-            products                   product_id  32951          32951               0
-             sellers                    seller_id   3095           3095               0
-category_translation        product_category_name     71             71               0
-
-=== 4. ORPHANS ===
-                         child                                     parent  orphan_rows
-            orders.customer_id                      customers.customer_id            0
-          order_items.order_id                            orders.order_id            0
-        order_items.product_id                        products.product_id            0
-         order_items.seller_id                          sellers.seller_id            0
-       order_payments.order_id                            orders.order_id            0
-        order_reviews.order_id                            orders.order_id            0
-products.product_category_name category_translation.product_category_name           13
-
-=== 5. MONTHLY ORDERS ===
-  month  orders  delivered_orders
-2016-09       4                 1
-2016-10     324               265
-2016-12       1                 1
-2017-01     800               750
-2017-02    1780              1653
-2017-03    2682              2546
-2017-04    2404              2303
-2017-05    3700              3546
-2017-06    3245              3135
-2017-07    4026              3872
-2017-08    4331              4193
-2017-09    4285              4150
-2017-10    4631              4478
-2017-11    7544              7289
-2017-12    5673              5513
-2018-01    7269              7069
-2018-02    6728              6555
-2018-03    7211              7003
-2018-04    6939              6798
-2018-05    6873              6749
-2018-06    6167              6099
-2018-07    6292              6159
-2018-08    6512              6351
-2018-09      16                 0
-2018-10       4                 0
-
-=== 6. ORDER STATUS ===
-order_status  orders   pct
-   delivered   96478 97.02
-     shipped    1107  1.11
-    canceled     625  0.63
- unavailable     609  0.61
-    invoiced     314  0.32
-  processing     301  0.30
-     created       5  0.01
-    approved       2  0.00
-
-=== 7. DELIVERY LOGIC ===
-                    metric     value
-          delivered_orders 96,478.00
-    delivered_missing_date      8.00
-not_delivered_but_has_date      6.00
- delivered_before_purchase      0.00
-               late_orders  7,826.00
-                  late_pct      8.11
-
-=== 8. COVERAGE ===
- orders  orders_without_items  orders_without_payments  orders_without_reviews
-  99441                   775                        1                     768
-
-=== 8. PAYMENTS PER ORDER ===
- payments_per_order  orders
-                  1   96479
-                  2    2382
-                  3     301
-                  4     108
-                  5      52
-                  6      36
-                  7      28
-                  8      11
-                  9       9
-                 10       5
-                 11       8
-                 12       8
-                 13       3
-                 14       2
-                 15       2
-                 19       2
-                 21       1
-                 22       1
-                 26       1
-                 29       1
-
-=== 8. PAYMENT RECONCILIATION ===
- orders_compared  mismatches_over_tolerance  mismatch_pct
-           98665                        249          0.25
-
-=== 9. REVIEWS PER ORDER ===
- reviews_per_order  orders
-                 1   98126
-                 2     543
-                 3       4
-
-=== 10. PRODUCTS ===
- products  no_category  weight_missing  weight_zero
-    32951          610               2            4
-
-=== 10. UNTRANSLATED CATEGORIES ===
-                                     category  products
-portateis_cozinha_e_preparadores_de_alimentos        10
-                                     pc_gamer         3
-
-=== 11. OUTLIERS ===
-                       field      n  unparseable  zero_or_negative  min    p50       p99       max
-           order_items.price 112650            0                 0 0.85  74.99    890.00  6,735.00
-   order_items.freight_value 112650            0               383 0.00  16.26     84.52    409.68
-order_payments.payment_value 103886            0                 9 0.00 100.00  1,039.92 13,664.08
-   products.product_weight_g  32951            2                 4 0.00 700.00 22,538.00 40,425.00
-
-=== 12. GEOLOCATION ===
-   rows  distinct_zips
-1000163          19015
+- Review the null-rate table (notebook section 2) and the review score distribution; add anything surprising as new rows above.
+- Confirm after the first full `dbt build` that all tests pass on the real data.

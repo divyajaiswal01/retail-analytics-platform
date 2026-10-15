@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: One row per order with typed timestamps. No business logic.
+    columns:
+      - name: order_id
+        description: Primary key.
+        data_tests: [unique, not_null]
+      - name: customer_id
+        description: Per-order customer identifier (not the real person; see stg_customers).
+        data_tests: [not_null]
+      - name: order_status
+        description: Order lifecycle status.
+        data_tests:
+          - accepted_values:
+              values: [created, approved, invoiced, processing, shipped, delivered, unavailable, canceled]
+      - name: purchased_at
+        description: When the order was placed.
+        data_tests: [not_null]
+
+  - name: stg_customers
+    description: One row per customer_id. customer_unique_id identifies the real person.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_unique_id
+        data_tests: [not_null]
+
+  - name: stg_order_items
+    description: One row per order item, money in BRL.
+    columns:
+      - name: order_item_key
+        description: Synthetic key, order_id + '-' + order_item_id.
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests: [not_null]
+      - name: price
+        description: Item price in BRL.
+        data_tests: [not_null]
+
+  - name: stg_order_payments
+    description: One row per payment. Orders can have several payments.
+    columns:
+      - name: payment_key
+        description: Synthetic key, order_id + '-' + payment_sequential.
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests: [not_null]
+
+  - name: stg_reviews
+    description: One review per order (most recent kept; see findings #9).
+    columns:
+      - name: order_id
+        description: Primary key after de-duplication.
+        data_tests: [unique, not_null]
+      - name: review_score
+        data_tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+              quote: false
+
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+
+  - name: stg_sellers
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: stg_category_translation
+    description: Portuguese to English category names, including two manual additions.
+    columns:
+      - name: category_name_pt
+        data_tests: [unique, not_null]
+
+  - name: stg_geolocation
+    description: One row per zip prefix (median coordinates). Not joined into marts yet.
+    columns:
+      - name: zip_prefix
+        data_tests: [unique, not_null]

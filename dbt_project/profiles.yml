@@ -1,0 +1,8 @@
+# Run dbt from inside the dbt_project/ folder: dbt looks for this file in the current directory.
+retail_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/warehouse.duckdb') }}"
+      threads: 4

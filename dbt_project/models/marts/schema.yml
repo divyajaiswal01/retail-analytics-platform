@@ -1,0 +1,185 @@
+version: 2
+
+models:
+  - name: dim_customer
+    description: One row per real customer (customer_unique_id). Location comes from the most recent order.
+    columns:
+      - name: customer_key
+        description: customer_unique_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: zip_prefix
+        description: Zip code prefix of the most recent record.
+      - name: city
+        description: Lower-cased city of the most recent record.
+      - name: state
+        description: Upper-cased 2-letter Brazilian state code.
+
+  - name: dim_product
+    description: One row per product with English category.
+    columns:
+      - name: product_key
+        description: product_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: category_name_pt
+        description: Original Portuguese category (NULL when the source had none).
+      - name: category_name_en
+        description: English category; 'unknown' when the product has no category.
+        data_tests: [not_null]
+      - name: weight_g
+        description: Weight in grams; NULL when missing or zero.
+      - name: length_cm
+        description: Package length in cm.
+      - name: height_cm
+        description: Package height in cm.
+      - name: width_cm
+        description: Package width in cm.
+      - name: photos_qty
+        description: Number of product photos.
+
+  - name: dim_seller
+    description: One row per seller.
+    columns:
+      - name: seller_key
+        description: seller_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: zip_prefix
+        description: Seller zip code prefix.
+      - name: city
+        description: Lower-cased seller city.
+      - name: state
+        description: Upper-cased 2-letter state code.
+
+  - name: dim_date
+    description: One row per calendar day covering the full order history.
+    columns:
+      - name: date_day
+        description: Calendar date. Primary key.
+        data_tests: [unique, not_null]
+      - name: year
+        description: Calendar year.
+      - name: quarter
+        description: Calendar quarter (1-4).
+      - name: month
+        description: Calendar month number (1-12).
+      - name: year_month
+        description: Year and month as text, e.g. 2017-11.
+      - name: month_name
+        description: English month name.
+      - name: week_start
+        description: Monday of the week containing the date.
+      - name: day_of_week
+        description: ISO day of week, 1 = Monday through 7 = Sunday.
+      - name: day_name
+        description: English day name.
+      - name: is_weekend
+        description: True for Saturday and Sunday.
+
+  - name: fact_orders
+    description: >
+      One row per order. Items, payments and reviews are aggregated to order level so no
+      measure is double counted. Money is in BRL. Revenue counts delivered orders only.
+      Filter on in_analysis_window for the chosen analysis period.
+    columns:
+      - name: order_id
+        description: Primary key.
+        data_tests: [unique, not_null]
+      - name: customer_key
+        description: Real customer (customer_unique_id). Foreign key to dim_customer.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_key
+      - name: order_date
+        description: Purchase date. Foreign key to dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: order_status
+        description: Order lifecycle status.
+        data_tests:
+          - accepted_values:
+              values: [created, approved, invoiced, processing, shipped, delivered, unavailable, canceled]
+      - name: is_delivered
+        description: True when order_status is delivered.
+        data_tests: [not_null]
+      - name: purchased_at
+        description: Purchase timestamp.
+      - name: delivered_at
+        description: Timestamp the customer received the order (may be NULL).
+      - name: estimated_delivery_at
+        description: Estimated delivery timestamp promised at purchase.
+      - name: item_count
+        description: Number of items in the order (0 when the order has no items).
+      - name: seller_count
+        description: Number of distinct sellers in the order.
+      - name: items_revenue
+        description: Sum of item prices in BRL, excluding freight, for any order status.
+      - name: delivered_revenue
+        description: items_revenue for delivered orders, otherwise 0. Use this for revenue KPIs.
+      - name: freight_total
+        description: Sum of freight charges in BRL.
+      - name: payment_count
+        description: Number of payment records for the order.
+      - name: payment_total
+        description: Sum of payment values in BRL.
+      - name: delivery_days
+        description: Whole days from purchase to delivery. NULL unless delivered with a delivery date.
+      - name: is_late
+        description: True when delivered after the estimated date. NULL unless delivery_days is known.
+      - name: review_score
+        description: Review score 1-5 (most recent review). NULL when no review.
+        data_tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+              quote: false
+      - name: in_analysis_window
+        description: True when order_date falls inside the analysis window set in dbt_project.yml.
+
+  - name: fact_order_items
+    description: One row per order item. Used for category, seller and demand analysis.
+    columns:
+      - name: order_item_key
+        description: Synthetic primary key, order_id + '-' + order_item_id.
+        data_tests: [unique, not_null]
+      - name: order_id
+        description: Foreign key to fact_orders.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('fact_orders')
+              field: order_id
+      - name: order_item_id
+        description: Item sequence number within the order.
+      - name: product_key
+        description: Foreign key to dim_product.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_key
+      - name: seller_key
+        description: Foreign key to dim_seller.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_seller')
+              field: seller_key
+      - name: order_date
+        description: Purchase date of the parent order. Foreign key to dim_date.
+        data_tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: order_status
+        description: Status of the parent order.
+      - name: is_delivered
+        description: True when the parent order was delivered.
+      - name: price
+        description: Item price in BRL.
+      - name: freight_value
+        description: Freight charge for the item in BRL.
+      - name: in_analysis_window
+        description: True when order_date falls inside the analysis window.
