@@ -1,0 +1,235 @@
+version: 2
+
+models:
+  - name: metrics_kpis
+    description: >
+      Monthly KPIs (one row per purchase month) for the analysis window. Money in BRL.
+      Revenue, AOV and delivery metrics use delivered orders only.
+    columns:
+      - name: year_month
+        description: Purchase month as text, e.g. 2017-11. Primary key.
+        data_tests: [unique, not_null]
+      - name: orders_placed
+        description: Orders placed in the month, all statuses.
+      - name: delivered_orders
+        description: Orders placed in the month that were delivered.
+      - name: delivered_revenue
+        description: Sum of item prices of delivered orders, excluding freight.
+      - name: aov
+        description: Average order value, delivered revenue divided by delivered orders with revenue.
+      - name: freight_total
+        description: Freight charged on delivered orders.
+      - name: unique_customers
+        description: Distinct customers with a delivered order in the month.
+      - name: new_customers
+        description: Customers whose first-ever delivered order was in this month.
+      - name: returning_customers
+        description: unique_customers minus new_customers.
+      - name: on_time_pct
+        description: Share of delivered orders with a known delivery date that arrived on or before the estimate.
+      - name: avg_delivery_days
+        description: Average days from purchase to delivery.
+      - name: avg_review_score
+        description: Average review score (1-5) of delivered orders.
+      - name: revenue_mom_growth_pct
+        description: Month-over-month change in delivered revenue; NULL for the first month.
+
+  - name: metrics_summary
+    description: One row of headline KPIs for the whole analysis window (delivered orders only).
+    columns:
+      - name: window_start
+        description: First day of the analysis window.
+      - name: window_end
+        description: Last day of the analysis window.
+      - name: delivered_orders
+        description: Delivered orders in the window.
+      - name: delivered_revenue
+        description: Total delivered revenue in BRL, excluding freight.
+      - name: aov
+        description: Average order value in BRL.
+      - name: customers
+        description: Distinct customers with a delivered order in the window.
+      - name: repeat_customers
+        description: Customers with two or more delivered orders in the window.
+      - name: repeat_rate_pct
+        description: repeat_customers divided by customers, as a percentage.
+      - name: on_time_pct
+        description: Share of delivered orders with a known delivery date that were on time.
+      - name: avg_delivery_days
+        description: Average days from purchase to delivery.
+      - name: avg_review_score
+        description: Average review score (1-5).
+
+  - name: mart_customer_rfm
+    description: One row per customer with a delivered, paid order in the window, with RFM scores and a segment.
+    columns:
+      - name: customer_key
+        description: customer_unique_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: last_order_date
+        description: Date of the customer's most recent delivered order in the window.
+      - name: recency_days
+        description: Days from last order to the day after the window ends.
+      - name: frequency
+        description: Number of delivered paid orders in the window.
+      - name: monetary
+        description: Total delivered revenue in BRL.
+      - name: r_score
+        description: Recency score 1-5 (5 = most recent).
+      - name: f_score
+        description: Frequency score 1 (one order), 2 (two orders), 3 (three or more).
+      - name: m_score
+        description: Monetary score 1-5 (5 = highest spend).
+      - name: segment
+        description: Rule-based customer segment derived from the three scores.
+        data_tests:
+          - accepted_values:
+              values:
+                - Repeat - active
+                - Repeat - lapsed
+                - Recent high-value
+                - Recent
+                - One-time - mid
+                - Lapsed high-value
+                - Lapsed
+
+  - name: mart_cohort_retention
+    description: Cohort retention by month of first delivered order. Month 0 is always 100%.
+    columns:
+      - name: cohort_month
+        description: Month of the customers' first delivered order.
+        data_tests: [not_null]
+      - name: months_since_first
+        description: Months elapsed since the cohort month.
+        data_tests: [not_null]
+      - name: cohort_size
+        description: Customers in the cohort.
+      - name: active_customers
+        description: Cohort customers with a delivered order in that month.
+      - name: retention_pct
+        description: active_customers divided by cohort_size, as a percentage.
+
+  - name: mart_delivery_impact
+    description: Review outcomes by how late the delivery was (delivered, reviewed orders in the window).
+    columns:
+      - name: bucket_order
+        description: Sort order of the delivery bucket. Primary key.
+        data_tests: [unique, not_null]
+      - name: delivery_bucket
+        description: Lateness bucket relative to the estimated delivery date.
+        data_tests:
+          - accepted_values:
+              values:
+                - on time or early
+                - 1-3 days late
+                - 4-7 days late
+                - 8-14 days late
+                - 15+ days late
+      - name: orders
+        description: Orders in the bucket.
+      - name: avg_review_score
+        description: Average review score (1-5).
+      - name: pct_low_reviews
+        description: Share of orders with a score of 1 or 2.
+      - name: pct_five_star
+        description: Share of orders with a score of 5.
+      - name: avg_delivery_days
+        description: Average days from purchase to delivery.
+
+  - name: mart_category_performance
+    description: Category revenue, share, ranking and year-over-year growth (delivered items in the window).
+    columns:
+      - name: revenue_rank
+        description: Rank by revenue, 1 = largest.
+      - name: category
+        description: English product category name.
+        data_tests: [unique, not_null]
+      - name: items_sold
+        description: Delivered items sold.
+      - name: orders
+        description: Distinct delivered orders containing the category.
+      - name: revenue
+        description: Item revenue in BRL, excluding freight.
+      - name: avg_price
+        description: Average item price in BRL.
+      - name: revenue_share_pct
+        description: Category share of total revenue.
+      - name: cumulative_share_pct
+        description: Running share of revenue from the top-ranked category down (Pareto view).
+      - name: revenue_current_period
+        description: Revenue in the yoy_current period set in dbt_project.yml.
+      - name: revenue_prior_period
+        description: Revenue in the same dates one year earlier.
+      - name: yoy_growth_pct
+        description: Growth from prior to current period; NULL when prior revenue is zero.
+
+  - name: mart_state_performance
+    description: Regional performance by customer state (delivered orders in the window).
+    columns:
+      - name: state
+        description: Two-letter Brazilian state code of the customer.
+        data_tests: [unique, not_null]
+      - name: customers
+        description: Distinct customers.
+      - name: delivered_orders
+        description: Delivered orders.
+      - name: delivered_revenue
+        description: Delivered revenue in BRL.
+      - name: aov
+        description: Average order value in BRL.
+      - name: revenue_share_pct
+        description: State share of total revenue.
+      - name: on_time_pct
+        description: Share of orders with a known delivery date delivered on time.
+      - name: avg_delivery_days
+        description: Average days from purchase to delivery.
+      - name: avg_review_score
+        description: Average review score (1-5).
+
+  - name: mart_seller_performance
+    description: >
+      Seller performance on delivered orders in the window. Orders with several sellers are
+      attributed to each. Sellers below seller_min_orders are not rankable.
+    columns:
+      - name: seller_key
+        description: seller_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: state
+        description: Seller state.
+      - name: orders
+        description: Delivered orders containing the seller's items.
+      - name: revenue
+        description: Seller item revenue in BRL.
+      - name: late_pct
+        description: Share of the seller's orders delivered late.
+      - name: avg_delivery_days
+        description: Average days from purchase to delivery.
+      - name: avg_review_score
+        description: Average review score (1-5) of the seller's reviewed orders.
+      - name: reviewed_orders
+        description: Orders with a review.
+      - name: meets_min_volume
+        description: True when orders is at least seller_min_orders.
+      - name: overall_late_pct
+        description: Marketplace-wide late percentage, for comparison.
+      - name: overall_avg_review_score
+        description: Marketplace-wide average review score, for comparison.
+
+  - name: mart_delivery_vs_repeat
+    description: Repeat-purchase rate within the horizon by whether the first delivery was late (association only).
+    columns:
+      - name: first_delivery
+        description: Whether the customer's first delivered order was late or on time/early.
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: [late, on time or early]
+      - name: customers
+        description: Eligible customers.
+      - name: repeat_customers
+        description: Customers who ordered again within the horizon.
+      - name: repeat_rate_pct
+        description: repeat_customers divided by customers, as a percentage.
+      - name: avg_first_review_score
+        description: Average review score of the first order.
