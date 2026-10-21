@@ -35,3 +35,7 @@ mlruns/
 Thumbs.db
 .vscode/
 .idea/
+
+# dbt anonymous user id
+dbt_project/.user.yml
+mlflow.db

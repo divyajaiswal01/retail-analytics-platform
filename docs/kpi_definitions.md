@@ -7,6 +7,7 @@ All KPIs use the **analysis window** (`analysis_start_date` to `analysis_end_dat
 - **Revenue counts delivered orders only**, using item price and excluding freight.
 - **Customers** are real people (`customer_unique_id`), not per-order `customer_id`.
 - **Months** are purchase months (the order date, not the delivery date).
+- Months that extend past `data_complete_through` (currently 2018-08-19) are flagged `is_complete_month = false` in `metrics_kpis`; their totals are understated and must not be read as a trend.
 - Delivery metrics need a delivered order **with** a delivery date; the few without are excluded from them but still count toward revenue.
 
 ## KPI table
@@ -34,4 +35,5 @@ All KPIs use the **analysis window** (`analysis_start_date` to `analysis_end_dat
 - **Repeat rate is low and right-censored:** customers acquired late in the window have had less time to return.
 - **Seller attribution:** orders with several sellers count toward each seller's lateness and reviews.
 - **Delivery impact is association, not causation:** late orders may differ in distance, product or seller.
+- **August 2018 is incomplete:** purchase capture thins out after about Aug 19, so its totals, and any growth figure that includes it, are understated.
 - **One holiday season** falls inside the window, so seasonality cannot be separated from a single spike.

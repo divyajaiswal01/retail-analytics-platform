@@ -113,6 +113,14 @@ retail-analytics-platform/
 │   │   │   ├── fact_orders.sql
 │   │   │   ├── fact_order_items.sql
 │   │   │   ├── metrics_kpis.sql
+│   │   │   ├── metrics_summary.sql
+│   │   │   ├── mart_customer_rfm.sql
+│   │   │   ├── mart_cohort_retention.sql
+│   │   │   ├── mart_delivery_impact.sql
+│   │   │   ├── mart_delivery_vs_repeat.sql
+│   │   │   ├── mart_category_performance.sql
+│   │   │   ├── mart_state_performance.sql
+│   │   │   ├── mart_seller_performance.sql
 │   │   │   ├── mart_weekly_category_demand.sql
 │   │   │   └── schema.yml
 │   ├── tests/                    # custom singular tests
@@ -124,7 +132,9 @@ retail-analytics-platform/
 │       ├── 01_eda.ipynb
 │       ├── 02_cohort_retention.ipynb
 │       ├── 03_rfm_segmentation.ipynb
-│       └── 04_delivery_impact.ipynb
+│       ├── 04_delivery_impact.ipynb
+│       ├── 05_category_region_seller.ipynb
+│       └── 06_forecast_review.ipynb
 │
 ├── forecasting/
 │   ├── __init__.py

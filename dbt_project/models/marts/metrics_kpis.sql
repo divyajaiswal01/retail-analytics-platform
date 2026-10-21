@@ -47,6 +47,14 @@ delivered as (
 
 ),
 
+month_bounds as (
+
+    select year_month, max(date_day) as month_end
+    from {{ ref('dim_date') }}
+    group by year_month
+
+),
+
 monthly as (
 
     select
@@ -84,5 +92,8 @@ select
         100.0 * (delivered_revenue - lag(delivered_revenue) over (order by year_month))
         / nullif(lag(delivered_revenue) over (order by year_month), 0),
         2
-    ) as revenue_mom_growth_pct
+    ) as revenue_mom_growth_pct,
+    -- False when the month extends beyond data_complete_through: its totals are understated
+    month_bounds.month_end <= cast('{{ var("data_complete_through") }}' as date) as is_complete_month
 from monthly
+inner join month_bounds using (year_month)

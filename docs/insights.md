@@ -17,7 +17,7 @@
 | Average delivery time | 12.5 days |
 | Average review score | 4.16 |
 
-**The story in four sentences.** The marketplace grew very fast through 2017 and then plateaued at roughly 6,000 to 7,000 delivered orders a month in 2018. Almost every customer buys once, so growth comes from acquiring new customers, not from retention. Late delivery is the biggest controllable problem: orders more than 3 days late average under 2.4 stars. Better on-time delivery is worth pursuing for reviews and reputation, but the data shows no meaningful effect on repeat revenue.
+**The story in four sentences.** The marketplace grew very fast through 2017, then slowed to roughly 6,000 to 7,000 delivered orders a month in the first half of 2018 (the data thins out after about Aug 19, 2018, so the most recent trend cannot be judged). Almost every customer buys once, so growth comes from acquiring new customers, not from retention. Late delivery is the biggest controllable problem: orders more than 3 days late average under 2.4 stars. Better on-time delivery is worth pursuing for reviews and reputation, but the data shows no meaningful effect on repeat revenue.
 
 ---
 
@@ -25,7 +25,7 @@
 **Source:** `mart_category_performance`, `mart_state_performance`
 
 - **Finding (categories):** The top 10 categories make up 62.5% of revenue. The largest are health_beauty (9.3%, BRL 1.23M), watches_gifts (8.8%) and bed_bath_table (7.8%).
-- **Finding (growth):** Revenue for Jan-Aug 2018 was 141% higher than Jan-Aug 2017 *(derived from the monthly table: BRL 7.22M vs 2.99M)*. Against that market rate:
+- **Finding (growth):** Revenue for Jan-Aug 2018 was 141% higher than Jan-Aug 2017 *(derived from the monthly table: BRL 7.22M vs 2.99M)*. This is slightly understated, because late August 2018 is incompletely captured (see Q2). Against that market rate:
   - Faster than the market: watches_gifts (+242%), health_beauty (+210%), housewares (+207%), auto (+174%).
   - Roughly in line: sports_leisure (+139%), computers_accessories (+131%).
   - Slower: furniture_decor (+123%), bed_bath_table (+109%), garden_tools (+54%), and cool_stuff (+10%).
@@ -36,10 +36,10 @@
 ## Q2. How do revenue, orders and AOV trend? Is there seasonality?
 **Source:** `metrics_kpis`
 
-- **Finding (trend):** Monthly revenue rose from BRL 112K (Jan 2017) to BRL 978K (May 2018), then eased to BRL 839K by Aug 2018, which is 14% below the May peak *(derived)*. Delivered orders have been flat at about 6,100 to 7,100 a month since Jan 2018.
+- **Finding (trend):** Monthly revenue rose from BRL 112K (Jan 2017) to BRL 978K (May 2018). Delivered orders were roughly flat at 6,100 to 7,100 a month from Jan to Jul 2018. **August 2018 must not be read as a decline:** daily items fall from about 290 on Aug 17 to 161 on Aug 23 and 16 on Aug 29, with no rows for Aug 30-31, which is the signature of incomplete data capture, not of falling demand. The August figures are therefore understated (roughly a fifth of the month's items are missing, *derived estimate*). Weekly items in late July to mid August (2,054 to 2,305) were in fact higher than in June (1,622 to 1,729), so there is no evidence of a decline.
 - **Finding (AOV):** AOV stayed in a narrow band of BRL 126 to 149 all period, so growth came from order volume, not basket size.
 - **Finding (seasonality):** November 2017 delivered 7,289 orders, 63% more than October, with revenue up 52% *(derived)*. Only one November is in the window, so this cannot be separated from a one-off event. *(Hypothesis: the spike is Black Friday week; check daily order counts to confirm.)*
-- **Recommendation:** Treat 2018 as a plateau and test acquisition channels. Plan capacity for a November peak every year (see Q5).
+- **Recommendation:** Treat the first half of 2018 as a slowdown from 2017's growth and test acquisition channels; the data cannot show what happened after about Aug 19. Plan capacity for a November peak every year (see Q5).
 - **Estimated impact and assumptions:** none claimed; the data cannot support a seasonal estimate from one year.
 
 ## Q3. What is the repeat-purchase rate and how does retention evolve?
@@ -89,8 +89,19 @@
 - **Recommendation:** Open a performance review for these 10 sellers and extend the same screen to all rankable sellers under a chosen score threshold. Because they carry under 1% of revenue, acting has little commercial risk.
 - **Estimated impact and assumptions:** the revenue at stake is small; the benefit is mainly reputational. Orders with several sellers are attributed to every seller involved, so treat the ranking as indicative.
 
-## Q8-Q9. Demand outlook and forecast uncertainty
-Completed in Phase 6 (`docs/forecast_report.md`).
+## Q8. What will weekly demand be by category over the next 8 weeks?
+**Source:** `forecast.weekly_forecast`, `docs/forecast_report.md`
+
+- **Finding:** For the 15 largest categories the outlook is flat: about 1,546 units a week, 1.6% below the last-4-week average and 1.0% above the last week. The forecast is a statistical extrapolation of recent demand, with no knowledge of promotions or growth, and it starts from the week of 2018-08-20 because later data is incomplete.
+- **Recommendation:** Plan with the 4-week moving average as the default and add a manual uplift for known peaks.
+- **Estimated impact and assumptions:** none claimed. A per-category "change vs the last 8 weeks" figure in the forecast table is misleading, since those weeks include two unusually low weeks in early July.
+
+## Q9. Which categories have the highest forecast uncertainty?
+**Source:** `forecast.category_uncertainty`, `forecast.accuracy_summary`
+
+- **Finding:** Typical error is about 26% to 29% of demand per category-week, roughly doubling from 1 to 8 weeks ahead. The hardest categories (holdout WAPE) are garden_tools (0.465), watches_gifts (0.428), office_furniture (0.372), computers_accessories (0.369) and cool_stuff (0.349); the easiest are bed_bath_table (0.154) and baby (0.200). No model beats a simple 4-week moving average, and all under-forecast the Black Friday spike by 52% to 58%.
+- **Recommendation:** Carry more safety stock for the hard categories, plan peaks manually, and do not rely on LightGBM at this history length.
+- **Estimated impact and assumptions:** none claimed. Error bands captured 71.7% of holdout actuals against a nominal 80%, so treat them as roughly 70% bands. The holdout is only 4 origins, so differences between the leading models are within noise.
 
 ## Q10. What is the estimated impact of improving on-time delivery?
 **Source:** `mart_delivery_vs_repeat`
@@ -112,9 +123,11 @@ Completed in Phase 6 (`docs/forecast_report.md`).
 | 4 | Back faster-growing categories; investigate cool_stuff | Q1 | Guides inventory and marketing; about BRL 270K gap vs market rate |
 | 5 | Plan peak-period capacity; investigate Feb-Mar 2018 | Q2, Q5 | Protects reviews during high-volume months |
 | 6 | Test retention with a holdout group | Q3, Q4 | Modest (a doubled repeat rate is about 2.9% of revenue) |
+| 7 | Plan weekly demand with a 4-week moving average, a manual peak uplift and category safety stock | Q8, Q9 | Simple and robust; avoids over-trusting a model that cannot beat it |
 
 ## Limitations to state in the README
 - One marketplace, anonymised, Sep 2016 to Oct 2018; the analysis window is 20 months with one holiday season.
+- Purchase capture thins out after about 2018-08-19, so August 2018 totals are understated. Monthly KPIs flag it (`is_complete_month = false`); the weekly demand table stops at the week ending Aug 19.
 - Repeat purchasing is rare and right-censored: late-acquired customers have had less time to return.
 - Delivery effects are associations, not proven causes; multi-seller orders count toward every seller.
 - Average delivery days fall in Jun-Aug 2018 (9.2, 8.9, 7.7). Part of that may be because orders still in transit at the data cutoff are not counted, so do not read it as a real improvement.

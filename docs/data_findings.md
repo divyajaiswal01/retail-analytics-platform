@@ -43,12 +43,13 @@ Window is a dbt variable (`analysis_start_date`, `analysis_end_date` in `dbt_pro
 | 13 | Outliers | Price: min 0.85, none zero or negative, p99 890, max 6,735. Freight: 383 rows at zero. Payment value: 9 rows at zero | Keep all values; nothing silently deleted. Zero freight is probably free shipping (hypothesis, not verified) | `stg_order_items`, `stg_order_payments` |
 | 14 | Orphan keys | 0 orphans on every relationship except products to category translation (13) | Relationship tests enforce this going forward; any future orphan fails the build | `schema.yml` tests |
 | 15 | Geolocation grain | 1,000,163 rows for 19,015 zip prefixes (about 53 per zip) | Reduce to one row per zip using median coordinates; not joined into marts yet (map uses state) | `stg_geolocation` |
+| 16 | Data completeness at the end | Daily items fall from 289 (Aug 17) and 283 (Aug 20) to 161 (Aug 23), 75 (Aug 25) and 16 (Aug 29), with no rows for Aug 30-31. All-status items per week: 2,054 (week of Aug 13) vs 1,192 (week of Aug 20). The final week has the HIGHEST delivered share (99.6%), which rules out delivery lag as the cause | Treat purchase data as reliable only through 2018-08-19 (`data_complete_through`). Weekly demand stops at the week ending Aug 19. August 2018 monthly figures are flagged `is_complete_month = false` and understated by roughly a fifth (estimate). The analysis window itself is unchanged | `dbt_project.yml`, `mart_weekly_category_demand`, `metrics_kpis` |
 
 ---
 
 ## 3. Data quality notes for the README
 
-- Coverage is Sep 2016 to Oct 2018, but only Jan 2017 to Aug 2018 is analysed (20 months).
+- Coverage is Sep 2016 to Oct 2018, but only Jan 2017 to Aug 2018 is analysed (20 months), and purchases are fully captured only through 2018-08-19 (finding #16).
 - The 20-month window contains only one holiday season (Nov 2017 spike: 7,544 orders vs 4,631 in Oct), so **yearly seasonality cannot be learned reliably**. A 52-week seasonal baseline is only possible from the second year onward. State this in the forecast report instead of overclaiming.
 - Data is anonymised and from a single Brazilian marketplace; all money is BRL, not converted.
 - Customers are identified by `customer_unique_id`; repeat purchasing is rare (3,345 of 99,441 `customer_id` rows, 3.4%, are extra IDs for returning customers), so repeat rate and cohort retention will be low and noisy.

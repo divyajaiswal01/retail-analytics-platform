@@ -33,6 +33,15 @@ models:
         description: Average review score (1-5) of delivered orders.
       - name: revenue_mom_growth_pct
         description: Month-over-month change in delivered revenue; NULL for the first month.
+      - name: is_complete_month
+        description: >
+          False when the month extends past data_complete_through, meaning purchases are not fully
+          captured and the month's totals are understated. Do not read a drop in such a month as a trend.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+              quote: false
 
   - name: metrics_summary
     description: One row of headline KPIs for the whole analysis window (delivered orders only).
@@ -233,3 +242,27 @@ models:
         description: repeat_customers divided by customers, as a percentage.
       - name: avg_first_review_score
         description: Average review score of the first order.
+
+  - name: mart_weekly_category_demand
+    description: >
+      Weekly delivered units per category (Monday-start weeks), complete weeks inside the analysis
+      window only, zero-filled so every category has a value for every week. Input to forecasting.
+    columns:
+      - name: demand_key
+        description: Synthetic primary key, category + '|' + week_start.
+        data_tests: [unique, not_null]
+      - name: week_start
+        description: Monday of the week.
+        data_tests: [not_null]
+      - name: category
+        description: English product category name.
+        data_tests: [not_null]
+      - name: units
+        description: Delivered items sold in the week. This is the forecast target.
+        data_tests: [not_null]
+      - name: orders
+        description: Distinct delivered orders containing the category in the week.
+      - name: revenue
+        description: Item revenue in BRL for the week, excluding freight.
+      - name: category_revenue_rank
+        description: Rank of the category by total window revenue (1 = largest), from mart_category_performance.

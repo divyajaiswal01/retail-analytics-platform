@@ -2,24 +2,29 @@ name: retail_analytics
 version: "1.0.0"
 config-version: 2
 profile: retail_analytics
- 
+
 model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
 clean-targets: ["target", "dbt_packages"]
- 
+
 # Analysis window decided in Phase 3 (see docs/data_findings.md, finding #2).
 # Rows outside the window are KEPT in the facts and flagged via in_analysis_window.
 vars:
   analysis_start_date: "2017-01-01"
   analysis_end_date: "2018-08-31"
- 
+
+  # Purchases stop being fully captured after this date: daily item counts fall from ~300 to ~16
+  # between Aug 20 and Aug 29, 2018 (see scripts/check_demand_tail.py and finding #16).
+  # Weekly demand and the monthly "complete" flag respect it. Change only with evidence.
+  data_complete_through: "2018-08-19"
+
   # Phase 5 analysis settings
   yoy_current_start: "2018-01-01"   # growth compares this period with the same dates one year earlier
   yoy_current_end: "2018-08-31"
   repeat_horizon_days: 180          # a customer "repeats" if they order again within this many days
   seller_min_orders: 30             # sellers below this volume are not ranked (too noisy)
- 
+
 models:
   retail_analytics:
     staging:
@@ -28,4 +33,3 @@ models:
     marts:
       +materialized: table
       +schema: marts
-
