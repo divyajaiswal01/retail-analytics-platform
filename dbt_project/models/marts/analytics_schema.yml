@@ -50,6 +50,8 @@ models:
         description: First day of the analysis window.
       - name: window_end
         description: Last day of the analysis window.
+      - name: data_complete_through
+        description: Last date through which purchases are fully captured (see dbt var data_complete_through). Later dates are understated.
       - name: delivered_orders
         description: Delivered orders in the window.
       - name: delivered_revenue
@@ -266,3 +268,29 @@ models:
         description: Item revenue in BRL for the week, excluding freight.
       - name: category_revenue_rank
         description: Rank of the category by total window revenue (1 = largest), from mart_category_performance.
+
+  - name: mart_sales_cube
+    description: >
+      Delivered items and revenue by purchase month, category and customer state. Only additive
+      measures, so any filter combination sums correctly. Feeds the dashboard drill-down.
+    columns:
+      - name: cube_key
+        description: Synthetic primary key, year_month + '|' + category + '|' + state.
+        data_tests: [unique, not_null]
+      - name: year_month
+        description: Purchase month as text, e.g. 2017-11.
+        data_tests: [not_null]
+      - name: category
+        description: English product category name.
+        data_tests: [not_null]
+      - name: state
+        description: Two-letter Brazilian state code of the customer ('unknown' if missing).
+        data_tests: [not_null]
+      - name: items_sold
+        description: Delivered items sold.
+      - name: revenue
+        description: Item revenue in BRL, excluding freight.
+      - name: is_complete_month
+        description: False when the month extends past data_complete_through, so its totals are understated.
+        data_tests:
+          - not_null

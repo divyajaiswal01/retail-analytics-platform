@@ -122,6 +122,7 @@ retail-analytics-platform/
 │   │   │   ├── mart_state_performance.sql
 │   │   │   ├── mart_seller_performance.sql
 │   │   │   ├── mart_weekly_category_demand.sql
+│   │   │   ├── mart_sales_cube.sql          # additive month x category x state, feeds the drill-down
 │   │   │   └── schema.yml
 │   ├── tests/                    # custom singular tests
 │   └── macros/
@@ -147,13 +148,19 @@ retail-analytics-platform/
 │   └── evaluate.py               # drift monitoring
 │
 ├── dashboard/
-│   ├── app.py                    # Streamlit entry
+│   ├── app.py                    # Streamlit entry: navigation + sidebar data status
 │   ├── pages/
 │   │   ├── 1_Executive_Overview.py
 │   │   ├── 2_Category_Drilldown.py
 │   │   ├── 3_Delivery_Performance.py
 │   │   └── 4_Forecast.py
-│   └── components/               # reusable charts and KPI cards
+│   └── components/
+│       ├── data.py               # cached read-only warehouse access, friendly errors
+│       ├── queries.py            # named SELECTs on marts / forecast tables only
+│       ├── charts.py             # Plotly figure builders (draw only, no calculations)
+│       ├── brazil_map.py         # offline tile-grid map of Brazilian states
+│       ├── definitions.py        # KPI tooltips mirroring docs/kpi_definitions.md
+│       └── ui.py                 # formats and Streamlit-version-safe helpers
 │
 ├── tests/
 │   ├── test_ingestion.py

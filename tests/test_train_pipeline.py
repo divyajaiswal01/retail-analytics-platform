@@ -60,6 +60,7 @@ def test_pipeline_writes_all_tables(warehouse: Path) -> None:
     tables = run(db_path=warehouse, config=FAST, use_mlflow=False)
     expected = {
         "weekly_forecast",
+        "weekly_forecast_all_models",
         "backtest_results",
         "model_selection",
         "accuracy_summary",
@@ -141,3 +142,18 @@ def test_trim_last_weeks_removes_newest_history(warehouse: Path) -> None:
 def test_trim_cannot_remove_everything(warehouse: Path) -> None:
     with pytest.raises(ValueError, match="entire history"):
         run(db_path=warehouse, config=replace(FAST, trim_last_weeks=N_WEEKS), use_mlflow=False)
+
+
+def test_all_models_table_covers_every_model_and_matches_the_chosen_forecast(
+    warehouse: Path,
+) -> None:
+    tables = run(db_path=warehouse, config=FAST, use_mlflow=False)
+    models = tables["weekly_forecast_all_models"]
+    assert {"naive", "moving_average_4", "ets", "lightgbm"} <= set(models["model"])
+    assert len(models) == 4 * 4 * 4  # models x categories x horizon
+    # the chosen forecast must equal that same model's row in the all-models table
+    chosen = tables["weekly_forecast"].merge(
+        models, on=["category", "week_start", "model"], suffixes=("", "_all")
+    )
+    assert len(chosen) == len(tables["weekly_forecast"])
+    assert (chosen["forecast_units"] - chosen["forecast_units_all"]).abs().max() < 1e-9

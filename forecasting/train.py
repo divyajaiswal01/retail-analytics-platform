@@ -69,18 +69,43 @@ def build_forecasters(config: ForecastConfig) -> dict[str, Forecaster]:
     }
 
 
+def forecast_all_models(
+    y: np.ndarray, forecasters: dict[str, Forecaster], horizon: int
+) -> dict[str, np.ndarray]:
+    """Fit every baseline and candidate on all history and forecast the next ``horizon`` weeks."""
+    needed = (*BASELINE_MODELS, *CANDIDATE_MODELS)
+    return {name: forecasters[name](y, horizon) for name in needed}
+
+
+def all_models_table(
+    all_forecasts: dict[str, np.ndarray], weeks: pd.DatetimeIndex, categories: list[str]
+) -> pd.DataFrame:
+    """Long table of every model's point forecast, to show the baseline beside the chosen model."""
+    rows = []
+    for model, values in all_forecasts.items():
+        for j, category in enumerate(categories):
+            for h in range(values.shape[0]):
+                rows.append(
+                    {
+                        "category": category,
+                        "week_start": weeks[-1] + pd.Timedelta(weeks=h + 1),
+                        "horizon": h + 1,
+                        "model": model,
+                        "forecast_units": float(values[h, j]),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
 def build_final_forecast(
-    y: np.ndarray,
     weeks: pd.DatetimeIndex,
     categories: list[str],
-    forecasters: dict[str, Forecaster],
+    all_forecasts: dict[str, np.ndarray],
     choices: pd.DataFrame,
     quantiles: pd.DataFrame,
     horizon: int,
 ) -> pd.DataFrame:
-    """Fit on all history, forecast the next ``horizon`` weeks with each category's chosen model."""
-    needed = {*BASELINE_MODELS, *CANDIDATE_MODELS}
-    all_forecasts = {name: forecasters[name](y, horizon) for name in needed}
+    """Forecast the next ``horizon`` weeks with each category's chosen model (already fitted)."""
     chosen = choices.set_index("category")["chosen_model"]
     qlow = quantiles.set_index("category")["q_low"]
     qhigh = quantiles.set_index("category")["q_high"]
@@ -293,8 +318,9 @@ def run(
         coverage,
         100 * (config.interval_high - config.interval_low),
     )
+    all_forecasts = forecast_all_models(y, forecasters, config.horizon)
     forecast = build_final_forecast(
-        y, weeks, categories, forecasters, choices, quantiles, config.horizon
+        weeks, categories, all_forecasts, choices, quantiles, config.horizon
     )
     uncertainty = build_uncertainty(
         forecast, category_accuracy, choices, y, categories, config.horizon
@@ -318,6 +344,7 @@ def run(
     )
     tables = {
         "weekly_forecast": forecast,
+        "weekly_forecast_all_models": all_models_table(all_forecasts, weeks, categories),
         "backtest_results": bt_with_policy,
         "model_selection": choices,
         "accuracy_summary": accuracy_summary,

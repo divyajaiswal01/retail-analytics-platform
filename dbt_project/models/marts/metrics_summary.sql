@@ -25,6 +25,7 @@ customers as (
 select
     cast('{{ var("analysis_start_date") }}' as date)                       as window_start,
     cast('{{ var("analysis_end_date") }}' as date)                         as window_end,
+    cast('{{ var("data_complete_through") }}' as date)                     as data_complete_through,
     (select count(*) from base)                                            as delivered_orders,
     (select sum(delivered_revenue) from base)                              as delivered_revenue,
     round(
